@@ -1,10 +1,10 @@
 import os
 
-BOT_TOKEN = "8278721432:AAH1Dx4n4mp5rn187bbR2KS5wxMEfrZLzes"  # Замени на свой токен
+BOT_TOKEN = "8826950538:AAG106Z5rsjJr215wo8PPOUogxy0i4CH8Ow"  # Замени на свой токен
 
 # Путь к баннеру (можешь положить картинку рядом или использовать URL-ссылку)
 BANNER_PATH = "sakura_banner.jpg"
-BOT_USERNAME = "testsakurarobot"
+BOT_USERNAME = "Sakura_Store67_bot"
 ADMIN_IDS = [6676713449]
 MANAGER_IDS = [] 
 MODER_IDS = []   
