@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from keyboards.profile_keyboards import get_profile_keyboard, get_status_info_keyboard
 from database.users_db import get_user, update_user, get_user_status
+from database.supabase_client import get_combined_coins
 
 router = Router()
 
@@ -14,12 +15,13 @@ class ProfileStates(StatesGroup):
     waiting_for_nickname = State()
     waiting_for_server = State()
 
-def format_profile_message(user_data: dict) -> str:
+def format_profile_message(user_data: dict, total_coins: int = None) -> str:
     """Форматирует сообщение с профилем пользователя"""
     if not user_data:
         return "❌ Пользователь не найден\nПожалуйста, перезапустите бота командой /start"
     
     status = get_user_status(user_data['total_purchases'] or 0)
+    coins_to_show = total_coins if total_coins is not None else (user_data['coins_balance'] or 0)
     
     message = (
         f"👤 Личный кабинет\n\n"
@@ -27,7 +29,7 @@ def format_profile_message(user_data: dict) -> str:
         f"🆔 Telegram ID: {user_data['user_id']}\n"
         f"🌍 Сервер: {user_data['server'] or 'Не указан'}\n"
         f"👑 Статус: {status['emoji']} {status['name']}\n"
-        f"🍀 Баланс Монет: {user_data['coins_balance'] or 0} 🪙\n"
+        f"🍀 Баланс Монет: {coins_to_show} 🪙\n"
         f"💰 Общая сумма покупок: {user_data['total_purchases'] or 0}💵\n"
         f"📦 Количество заказов: {user_data['orders_count'] or 0}\n"
         f"👥 Приглашено друзей: {user_data['referrals_count'] or 0}\n"
@@ -72,8 +74,9 @@ async def show_profile(message: Message):
         )
         user_data = get_user(message.from_user.id)
     
+    total_coins = await get_combined_coins(message.from_user.id, user_data['coins_balance'] or 0)
     await message.answer(
-        format_profile_message(user_data),
+        format_profile_message(user_data, total_coins),
         reply_markup=get_profile_keyboard()
     )
 
@@ -86,8 +89,9 @@ async def show_profile_callback(callback: CallbackQuery):
         await callback.answer("Пользователь не найден. Используйте /start")
         return
     
+    total_coins = await get_combined_coins(callback.from_user.id, user_data['coins_balance'] or 0)
     await callback.message.edit_text(
-        format_profile_message(user_data),
+        format_profile_message(user_data, total_coins),
         reply_markup=get_profile_keyboard()
     )
 
@@ -106,9 +110,10 @@ async def process_nickname(message: Message, state: FSMContext):
     await state.clear()
     
     user_data = get_user(message.from_user.id)
+    total_coins = await get_combined_coins(message.from_user.id, user_data['coins_balance'] or 0)
     await message.answer(f"✅ Ник успешно изменен на: {nickname}")
     await message.answer(
-        format_profile_message(user_data),
+        format_profile_message(user_data, total_coins),
         reply_markup=get_profile_keyboard()
     )
 
@@ -130,9 +135,10 @@ async def process_server(message: Message, state: FSMContext):
         await state.clear()
         
         user_data = get_user(message.from_user.id)
+        total_coins = await get_combined_coins(message.from_user.id, user_data['coins_balance'] or 0)
         await message.answer(f"✅ Сервер успешно изменен на: {server_name}")
         await message.answer(
-            format_profile_message(user_data),
+            format_profile_message(user_data, total_coins),
             reply_markup=get_profile_keyboard()
         )
     else:

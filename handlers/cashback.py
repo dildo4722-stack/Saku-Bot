@@ -2,7 +2,8 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from data.users import get_user_data
+from database.users_db import get_user, create_user, get_user_status
+from database.supabase_client import get_combined_coins
 
 router = Router()
 
@@ -24,20 +25,15 @@ def calculate_cashback(amount: int) -> int:
         100000: 100
     }
     
-    # Проверяем точные совпадения
     if amount in cashback_rates:
         return cashback_rates[amount]
     
-    # Если сумма больше 100000
     if amount > 100000:
-        # Базовые 100 монет за первые 100000
         coins = 100
-        # +1 монета за каждую 1000 сверх 100000
         extra_amount = amount - 100000
         coins += extra_amount // 1000
         return coins
     
-    # Если сумма между ставками
     if amount > 60000:
         return 60
     elif amount > 30000:
@@ -47,27 +43,20 @@ def calculate_cashback(amount: int) -> int:
     elif amount > 5000:
         return 5
     else:
-        # Для сумм меньше 5000 - 1 монета за каждую 1000
         return amount // 1000
 
-def get_cashback_info_message(user_data: dict) -> str:
+def get_cashback_info_message(status: dict, total_coins: int) -> str:
     """Формирует сообщение с информацией о кэшбэке"""
-    status = user_data["status"]
-    
-    # Определяем бонус к кэшбэку в зависимости от статуса
-    cashback_bonus = 0
     if status["name"] == "👑 Легенда Sakura":
-        cashback_bonus = 20
         bonus_text = "+20% к кэшбэку"
     elif status["name"] == "💎 VIP Клиент":
-        cashback_bonus = 10
         bonus_text = "+10% к Монетам"
     else:
         bonus_text = "Стандартный кэшбэк"
     
     message = (
         f"💰 *Кэшбэк*\n\n"
-        f"🍀 *Ваш баланс Монет:* {user_data['coins_balance']} 🍀\n"
+        f"🍀 *Ваш баланс Монет:* {total_coins} 🍀\n"
         f"👑 *Статус:* {status['emoji']} {status['name']}\n"
         f"📊 *Бонус:* {bonus_text}\n\n"
         f"⸻\n\n"
@@ -89,13 +78,23 @@ def get_cashback_info_message(user_data: dict) -> str:
     
     return message
 
+def _get_or_create_user(user_id: int, username: str, full_name: str):
+    user_data = get_user(user_id)
+    if not user_data:
+        create_user(user_id=user_id, username=username, first_name=full_name)
+        user_data = get_user(user_id)
+    return user_data
+
 @router.message(F.text == "❤️ Кэшбэк")
 async def show_cashback(message: Message):
     """Показывает информацию о кэшбэке"""
-    user_data = get_user_data(
+    user_data = _get_or_create_user(
         message.from_user.id,
-        message.from_user.username or message.from_user.full_name
+        message.from_user.username,
+        message.from_user.full_name
     )
+    status = get_user_status(user_data['total_purchases'] or 0)
+    total_coins = await get_combined_coins(message.from_user.id, user_data['coins_balance'] or 0)
     
     buttons = [
         [InlineKeyboardButton(text="🛍 Перейти в магазин", callback_data="shop")],
@@ -105,7 +104,7 @@ async def show_cashback(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     
     await message.answer(
-        get_cashback_info_message(user_data),
+        get_cashback_info_message(status, total_coins),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -113,10 +112,13 @@ async def show_cashback(message: Message):
 @router.callback_query(F.data == "cashback")
 async def show_cashback_callback(callback: CallbackQuery):
     """Показывает информацию о кэшбэке через callback"""
-    user_data = get_user_data(
+    user_data = _get_or_create_user(
         callback.from_user.id,
-        callback.from_user.username or callback.from_user.full_name
+        callback.from_user.username,
+        callback.from_user.full_name
     )
+    status = get_user_status(user_data['total_purchases'] or 0)
+    total_coins = await get_combined_coins(callback.from_user.id, user_data['coins_balance'] or 0)
     
     buttons = [
         [InlineKeyboardButton(text="🛍 Перейти в магазин", callback_data="shop")],
@@ -126,7 +128,7 @@ async def show_cashback_callback(callback: CallbackQuery):
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     
     await callback.message.edit_text(
-        get_cashback_info_message(user_data),
+        get_cashback_info_message(status, total_coins),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
