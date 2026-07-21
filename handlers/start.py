@@ -97,7 +97,7 @@ async def send_welcome_page(message: Message, referrer_id: int = None):
     
     # ===== ДОБАВЛЯЕМ КНОПКУ С МИНИ-ПРИЛОЖЕНИЕМ =====
     # Если есть реферал, передаем его в Mini App
-    web_app_url = "https://your-app.com"  # ЗАМЕНИТЕ НА ВАШ URL
+    web_app_url = "https://dildo4722-stack.github.io/tapsakutap/"  
     if referrer_id:
         web_app_url += f"?ref={referrer_id}"
     
